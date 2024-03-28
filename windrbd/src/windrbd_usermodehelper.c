@@ -105,7 +105,7 @@ int call_usermodehelper(char *path, char **argv, char **envp, enum umh_wait wait
 		status = KeWaitForSingleObject(&new_request->return_event, Executive, KernelMode, FALSE, NULL);
 
 		ret = new_request->retval;
-		printk("User mode helper returned %d (exit status is %d)\n", ret, (ret >> 8) & 0xff);
+		printk("User mode helper \"%s\" returned %d (exit status is %d)\n", (argv[0] != NULL && argv[1] != NULL) ? argv[1] : "unknown", ret, (ret >> 8) & 0xff);
 	}
 
 	mutex_lock(&request_mutex);
