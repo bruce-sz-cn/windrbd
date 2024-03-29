@@ -388,7 +388,7 @@ int find_next_zero_bit(const ULONG_PTR * addr, ULONG_PTR size, ULONG_PTR offset)
 
 static spinlock_t g_test_and_change_bit_lock;
 
-int test_and_change_bit(int nr, const ULONG_PTR *addr)
+int test_and_change_bit(int nr, volatile ULONG_PTR *addr)
 {
 	ULONG_PTR mask = BIT_MASK(nr);
 	ULONG_PTR *p = ((ULONG_PTR *) addr);

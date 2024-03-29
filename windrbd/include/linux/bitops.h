@@ -13,7 +13,8 @@ static void inline barrier(void)
 #define BIT_MASK(_nr)				(1ULL << ((_nr) % BITS_PER_LONG))
 #define BIT_WORD(_nr)				((_nr) / BITS_PER_LONG)
 
-extern int test_and_change_bit(int nr, const ULONG_PTR *vaddr);
+extern int test_and_change_bit(int nr, volatile ULONG_PTR *vaddr);
+
 extern ULONG_PTR find_first_bit(const ULONG_PTR* addr, ULONG_PTR size); //reference linux 3.x kernel. 64bit compatible
 extern ULONG_PTR find_next_bit(const ULONG_PTR *addr, ULONG_PTR size, ULONG_PTR offset);
 extern int find_next_zero_bit(const ULONG_PTR * addr, ULONG_PTR size, ULONG_PTR offset);
