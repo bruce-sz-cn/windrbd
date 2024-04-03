@@ -1999,16 +1999,15 @@ dbg("bio->bi_iter.bi_size: %d bio->bi_iter.bi_sector: %d bio->bi_mdl_offset: %d\
 
 		if (irp == NULL) {
 			NTSTATUS status;
-			LARGE_INTEGER timeout;
 
-		        timeout.QuadPart = -10*1000*1000*10; /* 10 seconds */
-	                status = KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, &timeout);
-		        if (status == STATUS_TIMEOUT) {
-				printk("Warning: timeout on reading boot sector  via DRBD\n");
-			}
-			if (status != STATUS_SUCCESS) {
-				return status;
-			}
+			do {
+		                status = KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, NULL);
+				if (status != STATUS_SUCCESS) {
+					printk("Ouhh KeWaitForSingleObject returned status %x, don't really know what to do.\n", status);
+					msleep(1000);
+				}
+			} while (status != STATUS_SUCCESS);
+
 				/* And clean up */
 			put_page(bio->bi_io_vec[0].bv_page);
 			kfree(bio->bi_common_data);
