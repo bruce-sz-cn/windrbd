@@ -961,6 +961,10 @@ void bio_free(struct bio *bio)
 	int i;
 	struct bio *upper_bio = bio->is_cloned_from;
 
+	if (!list_empty(&bio->locally_submitted_bios)) {
+		printk("Warning: bio->locally_submitted_bios not empty.\n");
+	}
+
 		/* DRBD considers pages here as not in use any more.
 		 * however we still have MDLs referencing memory
 		 * of the page. So take a reference here and drop
@@ -971,9 +975,8 @@ void bio_free(struct bio *bio)
 	list_add(&bio->to_be_freed_list, &bios_to_be_freed_list);
 	spin_unlock_irqrestore(&bios_to_be_freed_lock, flags);
 
-	if (!list_empty(&bio->locally_submitted_bios)) {
-		printk("Warning: bio->locally_submitted_bios not empty.\n");
-	}
+		/* starting here bio might be invalid */
+
 	if (upper_bio != NULL)
 		bio_put(upper_bio);
 
