@@ -5,6 +5,21 @@ Base on DRBD 9.1
 
 DRBD reactor support
 
+What's new in version 1.1.12
+----------------------------
+
+Ensure that at most one fencing script is running at the same time
+
+Thaw I/O also when peer is outdated (when there is a valid connection
+	we can exit fencing mode)
+
+Fix for exiting fencing mode on drbdadm disconnect
+
+No timeout on reading boot sector (when probing for existing file
+systems on backing disks)
+
+Eliminated a Warning message regarding bio still on some list
+
 What's new in version 1.1.11
 ----------------------------
 
