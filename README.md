@@ -323,3 +323,4 @@ Version history
  * 1.1.9 (Jan 15, 2024): Disk timeout, fix for drbdadm adjust network config BSOD
  * 1.1.10 (Feb 21, 2024): Memory pressure fixes, drbdadm primary hang fix
  * 1.1.11 (Mar 26, 2024): update cygwin DLL 3.4.5 -> 3.4.10
+ * 1.1.12 (Apr 15, 2024): several fixes (in DRBD) related to fencing
