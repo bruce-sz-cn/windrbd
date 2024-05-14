@@ -5,6 +5,13 @@ Base on DRBD 9.1
 
 DRBD reactor support
 
+What's new in version 1.1.14
+----------------------------
+
+downgrade cygwin DLL 3.5.3 -> 3.4.10
+
+Fix for drbdadm create-md: clear whole device for external metadata
+
 What's new in version 1.1.13
 ----------------------------
 
