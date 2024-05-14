@@ -325,3 +325,4 @@ Version history
  * 1.1.11 (Mar 26, 2024): update cygwin DLL 3.4.5 -> 3.4.10
  * 1.1.12 (Apr 15, 2024): several fixes (in DRBD) related to fencing
  * 1.1.13 (Apr 30, 2024): update cygwin DLL 3.4.10 -> 3.5.3
+ * 1.1.14 (May 14, 2024): Fix for drbdadm create-md, downgrade cygwin DLL 3.5.3 -> 3.4.10
