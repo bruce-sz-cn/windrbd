@@ -32,6 +32,8 @@
  * To fix use:
  *	completion_event = kmalloc(sizeof(*completion_event));
  * instead of events on the stack.
+ *
+ * Update: yes this really happens!
  */
 
 #define WSK_DEINITIALIZED	0
