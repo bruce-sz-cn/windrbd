@@ -208,7 +208,6 @@ static void windrbd_thread_setup(void *targ)
 	struct task_struct *t = targ;
 	int ret;
 	NTSTATUS status;
-	BOOLEAN old_stack_swap_enable;
 
 		/* Linux never swaps out kernel stack areas. This
 		 * should fix a very rare list corruption in a
@@ -217,9 +216,7 @@ static void windrbd_thread_setup(void *targ)
 		 * list corruption).
 		 */
 
-	old_stack_swap_enable = KeSetKernelStackSwapEnable(FALSE);
-
-printk("stack swap was %s\n", old_stack_swap_enable ? "ENABLED" : "DISABLED");
+	KeSetKernelStackSwapEnable(FALSE);
 
 		/* t->windows_thread may be still invalid here, do not
 		 * printk().
