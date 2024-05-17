@@ -11,6 +11,10 @@
 #include "windrbd_threads.h"
 #include <wdm.h>
 
+/* Can not include both wdm.h and ntifs.h hence the prototype here: */
+
+extern BOOLEAN KeSetKernelStackSwapEnable(BOOLEAN Enable);
+
 static LIST_HEAD(thread_list);
 static spinlock_t thread_list_lock;
 
@@ -204,6 +208,18 @@ static void windrbd_thread_setup(void *targ)
 	struct task_struct *t = targ;
 	int ret;
 	NTSTATUS status;
+	BOOLEAN old_stack_swap_enable;
+
+		/* Linux never swaps out kernel stack areas. This
+		 * should fix a very rare list corruption in a
+		 * wake_up() call (the list contained an element
+		 * that was on a stack that was swapped out, causing
+		 * list corruption).
+		 */
+
+	old_stack_swap_enable = KeSetKernelStackSwapEnable(FALSE);
+
+printk("stack swap was %s\n", old_stack_swap_enable ? "ENABLED" : "DISABLED");
 
 		/* t->windows_thread may be still invalid here, do not
 		 * printk().
@@ -212,6 +228,8 @@ static void windrbd_thread_setup(void *targ)
         status = KeWaitForSingleObject(&t->start_event, Executive, KernelMode, FALSE, (PLARGE_INTEGER)NULL);
         if (!NT_SUCCESS(status)) {
 		printk("On waiting for start event: KeWaitForSingleObject failed with status %x\n", status);
+
+		KeSetKernelStackSwapEnable(TRUE);
 		return;
 	}
 	ret = t->threadfn(t->data);
@@ -226,6 +244,10 @@ static void windrbd_thread_setup(void *targ)
 	if (KeGetCurrentIrql() > PASSIVE_LEVEL)
 		printk("Warning: IRQL is %d when exiting thread. System will posibly lockup.\n", KeGetCurrentIrql());
 
+		/* According to Microsoft docs we must not exit a thread
+		 * with stack swapping disabled, so enable it here again.
+		 */
+	KeSetKernelStackSwapEnable(TRUE);
 // printk("exiting %p...\n", t);
 	t->is_zombie = 1;
 }
@@ -381,6 +403,8 @@ struct task_struct *make_me_a_windrbd_thread(const char *name, ...)
 	t->pid = next_pid;
 	spin_unlock_irqrestore(&next_pid_lock, flags);
 
+	KeSetKernelStackSwapEnable(FALSE);
+
 	spin_lock_irqsave(&thread_list_lock, flags);
 	list_add(&t->list, &thread_list);
 	spin_unlock_irqrestore(&thread_list_lock, flags);
@@ -389,12 +413,15 @@ struct task_struct *make_me_a_windrbd_thread(const char *name, ...)
 }
 
 	/* Call this when a thread returns to the calling Windows
-	 * kernel function.
+	 * kernel function. This is mandatory since we enable
+	 * stack swapping in here again.
 	 */
 
 void return_to_windows(struct task_struct *t)
 {
 	KIRQL flags;
+
+	KeSetKernelStackSwapEnable(TRUE);
 
 	spin_lock_irqsave(&thread_list_lock, flags);
 	list_del(&t->list);
