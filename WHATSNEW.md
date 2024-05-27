@@ -5,6 +5,14 @@ Base on DRBD 9.1
 
 DRBD reactor support
 
+What's new in version 1.1.15
+----------------------------
+
+Kernel threads are now running with stack swapping disabled. This
+should fix some very rare BSODs when another thread accesses the
+stack (for example an event structure) of a thread whichs stack
+is swapped out.
+
 What's new in version 1.1.14
 ----------------------------
 
