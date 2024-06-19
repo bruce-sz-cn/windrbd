@@ -2508,7 +2508,7 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 			/* TODO: really? better use atomic_dec_return .. */
 			/* TODO: only if this is a backing device !! (else BSOD) */
 		atomic_dec(&bio->bi_bdev->num_bios_pending);
-if (bio->bi_bdev->bios_event.next == NULL)
+if (bio->bi_bdev->bios_event.head.next == NULL) {
 printk("bio->bi_bdev->num_bios_pending is %d\n", bio->bi_bdev->num_bios_pending);
 } else {
 		if (atomic_read(&bio->bi_bdev->num_bios_pending) == 0) {
