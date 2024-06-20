@@ -2506,15 +2506,10 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 
 	if (was_accounted) {
 			/* TODO: really? better use atomic_dec_return .. */
-			/* TODO: only if this is a backing device !! (else BSOD) */
 		atomic_dec(&bio->bi_bdev->num_bios_pending);
-if (bio->bi_bdev->bios_event.head.next == NULL) {
-printk("bio->bi_bdev->num_bios_pending is %d\n", bio->bi_bdev->num_bios_pending);
-} else {
 		if (atomic_read(&bio->bi_bdev->num_bios_pending) == 0) {
 			wake_up(&bio->bi_bdev->bios_event);
 		}
-}
 	}
 
 	bio_put(bio);
@@ -3286,6 +3281,7 @@ struct block_device *blkdev_get_by_path(const char *path, fmode_t mode, void *ho
 	atomic_set(&block_device->num_bios_pending, 0);
 	atomic_set(&block_device->num_irps_pending, 0);
 
+		/* TODO: these are not used any more? */
 	INIT_LIST_HEAD(&block_device->write_cache);
 	spin_lock_init(&block_device->write_cache_lock);
 
@@ -3687,6 +3683,14 @@ block_device->my_auto_promote = 1;
 		 * find the disk device.
 		 */
 	block_device->is_disk_device = true;
+
+	init_waitqueue_head(&block_device->bios_event);
+	atomic_set(&block_device->num_bios_pending, 0);
+	atomic_set(&block_device->num_irps_pending, 0);
+
+		/* TODO: these are not used any more? */
+	INIT_LIST_HEAD(&block_device->write_cache);
+	spin_lock_init(&block_device->write_cache_lock);
 
 		/* Corking ... new with 1.1.8 */
 	block_device->corked = false;

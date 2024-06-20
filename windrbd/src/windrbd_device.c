@@ -1820,6 +1820,7 @@ static void drbd_make_request_work(struct work_struct *w)
 	struct io_request *ioreq = container_of(w, struct io_request, w);
 
 // printk("1\n");
+	atomic_inc(&ioreq->bio->bi_bdev->num_bios_pending);
 	drbd_submit_bio(ioreq->bio);
 // printk("2\n");
 	kfree(ioreq);
