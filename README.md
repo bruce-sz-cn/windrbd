@@ -327,3 +327,4 @@ Version history
  * 1.1.13 (Apr 30, 2024): update cygwin DLL 3.4.10 -> 3.5.3
  * 1.1.14 (May 14, 2024): Fix for drbdadm create-md, downgrade cygwin DLL 3.5.3 -> 3.4.10
  * 1.1.15 (May 27, 2024): Kernel stacks locked in memory fixing a rare BSOD
+ * 1.1.16 (June 26, 2024): Initialize bios_event also for upper block devices
