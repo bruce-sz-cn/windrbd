@@ -5,6 +5,13 @@ Base on DRBD 9.1
 
 DRBD reactor support
 
+What's new in version 1.1.16
+----------------------------
+
+Initialize bios_event also for upper block devices. This should
+fix a BSOD that might trigger after 4 billion I/O requests on the
+upper device.
+
 What's new in version 1.1.15
 ----------------------------
 
