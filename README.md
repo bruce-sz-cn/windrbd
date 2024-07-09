@@ -7,11 +7,19 @@ Clone this repository with
 
 else you get an incomplete checkout.
 
-If you need installable binaries with a signed driver please go to
+If you need installable binaries (self-signed) please go to
 
 https://linbit.com/linbit-software-download-page-for-linstor-and-drbd-linux-driver/#drbd-windows
 
-If you need support, please contact Linbit (www.linbit.com)
+You will have to put your Windows machine into test mode
+for the driver to load. To do so run
+
+	bcdedit /set TESTSIGNING ON
+
+as Administrator and reboot the machine.
+
+If you need support or if you need officially signed binaries
+(no need for testmode), please contact Linbit (www.linbit.com)
 at sales@linbit.com
 
 What is WinDRBD?
