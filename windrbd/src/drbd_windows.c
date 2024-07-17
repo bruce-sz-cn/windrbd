@@ -828,6 +828,7 @@ static struct bio *bio_alloc_ll(gfp_t gfp_mask, int nr_iovecs, ULONG Tag)
 	spin_lock_init(&bio->already_failed_lock);
 	bio->already_failed = false;
 	bio->where_i_am = "just allocated";
+	bio->submission_timestamp = 0;
 
 	return bio;
 }
@@ -1748,6 +1749,23 @@ int wait_for_bios_to_complete(struct block_device *bdev)
 
 static void bio_endio_impl(struct bio *bio, bool was_accounted);
 
+
+static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
+{
+	struct bio *bio;
+	unsigned long long oldest = jiffies;
+	KIRQL flags;
+
+	spin_lock_irqsave(&bdev->in_flight_bios_lock, flags);
+	list_for_each_entry(struct bio, bio, &bdev->in_flight_bios, locally_submitted_bios) {
+		if (bio->submission_timestamp != 0 && bio->submission_timestamp < oldest)
+			oldest = bio->submission_timestamp;
+	}
+	spin_unlock_irqrestore(&bdev->in_flight_bios_lock, flags);
+
+	return oldest;
+}
+
 void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_status)
 {
 	KIRQL flags;
@@ -2442,6 +2460,7 @@ int generic_make_request(struct bio *bio)
 
 	spin_lock_irqsave(&bdev->in_flight_bios_lock, flags);
 	list_add(&bio->locally_submitted_bios, &bdev->in_flight_bios);
+	bio->submission_timestamp = jiffies;
 	spin_unlock_irqrestore(&bdev->in_flight_bios_lock, flags);
 
 	if (bdev->corked) {
