@@ -1750,6 +1750,14 @@ int wait_for_bios_to_complete(struct block_device *bdev)
 static void bio_endio_impl(struct bio *bio, bool was_accounted);
 
 
+static void disk_timeout_timer_fn(struct timer_list *t)
+{
+	struct block_device *bdev = from_timer(bdev, t, disk_timeout_timer, struct block_device);
+
+	printk("Disk timeout timer expired, failing all I/O requests...\n");
+	windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
+}
+
 static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
 {
 	struct bio *bio;
@@ -1790,6 +1798,15 @@ void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_status)
 		bio->bi_status = bi_status;
 		bio_endio(bio); /* will remove this bio from the list */
 	}
+}
+
+static void rearm_disk_timeout_timer(struct block_device *bdev)
+{
+	unsigned long long oldest = oldest_bio_timestamp(bdev);
+	if (oldest + bdev->disk_timeout <= jiffies)
+		windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
+	else
+		mod_timer(&bdev->disk_timeout_timer, oldest + bdev->disk_timeout);
 }
 
 NTSTATUS DrbdIoCompletion(
@@ -2463,6 +2480,8 @@ int generic_make_request(struct bio *bio)
 	bio->submission_timestamp = jiffies;
 	spin_unlock_irqrestore(&bdev->in_flight_bios_lock, flags);
 
+	rearm_disk_timeout_timer(bdev);
+
 	if (bdev->corked) {
 		bio->where_i_am = "in generic_make_request bdev corked";
 		bio_get(bio);	/* we want to put it on a list. */
@@ -2508,6 +2527,8 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 	spin_lock_irqsave(&bio->bi_bdev->in_flight_bios_lock, flags2);
 	list_del_init(&bio->locally_submitted_bios);
 	spin_unlock_irqrestore(&bio->bi_bdev->in_flight_bios_lock, flags2);
+
+	rearm_disk_timeout_timer(bio->bi_bdev);
 
 	bio->already_failed = true;
 	spin_unlock_irqrestore(&bio->already_failed_lock, flags);
@@ -3313,6 +3334,10 @@ struct block_device *blkdev_get_by_path(const char *path, fmode_t mode, void *ho
 	spin_lock_init(&block_device->in_flight_bios_lock);
 	INIT_LIST_HEAD(&block_device->in_flight_bios);
 
+		/* we have our own timer now, new in 1.1.17 */
+	block_device->disk_timeout = HZ;	/* TODO: 1 second, hardcoded */
+        timer_setup(&block_device->disk_timeout_timer, disk_timeout_timer_fn, 0);
+
 	inject_faults(-1, &block_device->inject_on_completion);
 	inject_faults(-1, &block_device->inject_on_request);
 
@@ -3718,7 +3743,9 @@ block_device->my_auto_promote = 1;
 		/* fail I/O on disk timeout, new in 1.1.9 */
 	spin_lock_init(&block_device->in_flight_bios_lock);
 	INIT_LIST_HEAD(&block_device->in_flight_bios);
-
+		/* we have our own timer now, new in 1.1.17 */
+	block_device->disk_timeout = HZ;	/* TODO: 1 second, hardcoded */
+        timer_setup(&block_device->disk_timeout_timer, disk_timeout_timer_fn, 0);
 	inject_faults(-1, &block_device->inject_on_completion);
 	inject_faults(-1, &block_device->inject_on_request);
 
