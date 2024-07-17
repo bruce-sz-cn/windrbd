@@ -1758,6 +1758,14 @@ static void disk_timeout_timer_fn(struct timer_list *t)
 	windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
 }
 
+/* TODO: For the 'new' (1.1.17) disk timeout implementation:
+	1.) cancel timer when there are no bios in flight.
+	2.) remove DRBD instrumented code related to 1.1.9 disk timeout implementation
+	3.) Why are there more timer triggers even when the disk failed?
+	4.) Test for data metadata and also primary secondary
+	5.) also test with external meta data
+ */
+
 static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
 {
 	struct bio *bio;
