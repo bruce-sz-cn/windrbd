@@ -1779,7 +1779,7 @@ static void disk_timeout_timer_fn(struct timer_list *t)
 {
 	struct block_device *bdev = from_timer(bdev, t, disk_timeout_timer, struct block_device);
 
-	printk("Disk timeout timer expired, failing all I/O requests...\n");
+	printk("Disk timeout timer expired, failing all I/O requests for block device %p...\n", bdev);
 	windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
 }
 
@@ -1817,18 +1817,13 @@ static void rearm_disk_timeout_timer(struct block_device *bdev)
 {
 	unsigned long long oldest = oldest_bio_timestamp(bdev);
 
-printk("1\n");
-	if (oldest == 0) {
-printk("2\n");
+		/* TODO: del_timer_sync? */
+	if (oldest == 0)
 		del_timer(&bdev->disk_timeout_timer);
-	} else if (oldest + bdev->disk_timeout <= jiffies) {
-printk("3\n");
+	else if (oldest + bdev->disk_timeout <= jiffies)
 		windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
-	} else {
-printk("4\n");
+	else
 		mod_timer(&bdev->disk_timeout_timer, oldest + bdev->disk_timeout);
-	}
-printk("5\n");
 }
 
 static void bio_endio_impl(struct bio *bio, bool was_accounted);
@@ -2504,7 +2499,6 @@ int generic_make_request(struct bio *bio)
 	bio->submission_timestamp = jiffies;
 	spin_unlock_irqrestore(&bdev->in_flight_bios_lock, flags);
 
-printk("1\n");
 	rearm_disk_timeout_timer(bdev);
 
 	if (bdev->corked) {
@@ -2556,7 +2550,6 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 	bio->already_failed = true;
 	spin_unlock_irqrestore(&bio->already_failed_lock, flags);
 
-printk("1\n");
 	if (!bio->disk_timeout)
 		rearm_disk_timeout_timer(bio->bi_bdev);
 
@@ -4222,6 +4215,8 @@ int windrbd_become_secondary(struct drbd_device *device, const char **err_str)
 static void windrbd_destroy_block_device(struct kref *kref)
 {
 	struct block_device *bdev = container_of(kref, struct block_device, kref);
+
+	del_timer(&bdev->disk_timeout_timer);
 
 		/* This is legal. Users may create DRBD devices without
 		 * mount point.
