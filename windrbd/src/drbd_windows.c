@@ -829,6 +829,7 @@ static struct bio *bio_alloc_ll(gfp_t gfp_mask, int nr_iovecs, ULONG Tag)
 	bio->already_failed = false;
 	bio->where_i_am = "just allocated";
 	bio->submission_timestamp = 0;
+	bio->disk_timeout = 0;
 
 	return bio;
 }
@@ -1769,6 +1770,7 @@ static void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_st
 	list_for_each_entry(struct bio, bio, &tmp_list, locally_submitted_bios2) {
 // printk("disk timeout, failing bio %p (was last at %s)\n", bio, bio->where_i_am);
 		bio->bi_status = bi_status;
+		bio->disk_timeout = 1;
 		bio_endio(bio); /* will remove this bio from the list */
 	}
 }
@@ -1815,12 +1817,18 @@ static void rearm_disk_timeout_timer(struct block_device *bdev)
 {
 	unsigned long long oldest = oldest_bio_timestamp(bdev);
 
-	if (oldest == 0)
+printk("1\n");
+	if (oldest == 0) {
+printk("2\n");
 		del_timer(&bdev->disk_timeout_timer);
-	else if (oldest + bdev->disk_timeout <= jiffies)
+	} else if (oldest + bdev->disk_timeout <= jiffies) {
+printk("3\n");
 		windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
-	else
+	} else {
+printk("4\n");
 		mod_timer(&bdev->disk_timeout_timer, oldest + bdev->disk_timeout);
+	}
+printk("5\n");
 }
 
 static void bio_endio_impl(struct bio *bio, bool was_accounted);
@@ -2496,6 +2504,7 @@ int generic_make_request(struct bio *bio)
 	bio->submission_timestamp = jiffies;
 	spin_unlock_irqrestore(&bdev->in_flight_bios_lock, flags);
 
+printk("1\n");
 	rearm_disk_timeout_timer(bdev);
 
 	if (bdev->corked) {
@@ -2544,10 +2553,12 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 	list_del_init(&bio->locally_submitted_bios);
 	spin_unlock_irqrestore(&bio->bi_bdev->in_flight_bios_lock, flags2);
 
-	rearm_disk_timeout_timer(bio->bi_bdev);
-
 	bio->already_failed = true;
 	spin_unlock_irqrestore(&bio->already_failed_lock, flags);
+
+printk("1\n");
+	if (!bio->disk_timeout)
+		rearm_disk_timeout_timer(bio->bi_bdev);
 
 	bio_get(bio);
 
