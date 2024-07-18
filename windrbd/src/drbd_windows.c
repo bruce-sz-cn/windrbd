@@ -1747,42 +1747,7 @@ int wait_for_bios_to_complete(struct block_device *bdev)
 	return 0;
 }
 
-static void bio_endio_impl(struct bio *bio, bool was_accounted);
-
-
-static void disk_timeout_timer_fn(struct timer_list *t)
-{
-	struct block_device *bdev = from_timer(bdev, t, disk_timeout_timer, struct block_device);
-
-	printk("Disk timeout timer expired, failing all I/O requests...\n");
-	windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
-}
-
-/* TODO: For the 'new' (1.1.17) disk timeout implementation:
-	1.) cancel timer when there are no bios in flight.
-	2.) remove DRBD instrumented code related to 1.1.9 disk timeout implementation
-	3.) Why are there more timer triggers even when the disk failed?
-	4.) Test for data metadata and also primary secondary
-	5.) also test with external meta data
- */
-
-static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
-{
-	struct bio *bio;
-	unsigned long long oldest = jiffies;
-	KIRQL flags;
-
-	spin_lock_irqsave(&bdev->in_flight_bios_lock, flags);
-	list_for_each_entry(struct bio, bio, &bdev->in_flight_bios, locally_submitted_bios) {
-		if (bio->submission_timestamp != 0 && bio->submission_timestamp < oldest)
-			oldest = bio->submission_timestamp;
-	}
-	spin_unlock_irqrestore(&bdev->in_flight_bios_lock, flags);
-
-	return oldest;
-}
-
-void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_status)
+static void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_status)
 {
 	KIRQL flags;
 	struct list_head tmp_list;
@@ -1808,14 +1773,57 @@ void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_status)
 	}
 }
 
+static void disk_timeout_timer_fn(struct timer_list *t)
+{
+	struct block_device *bdev = from_timer(bdev, t, disk_timeout_timer, struct block_device);
+
+	printk("Disk timeout timer expired, failing all I/O requests...\n");
+	windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
+}
+
+/* TODO: For the 'new' (1.1.17) disk timeout implementation:
+	1.) cancel timer when there are no bios in flight.
+	2.) remove DRBD instrumented code related to 1.1.9 disk timeout implementation
+	3.) Why are there more timer triggers even when the disk failed?
+	4.) Test for data metadata and also primary secondary
+	5.) also test with external meta data
+ */
+
+static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
+{
+	struct bio *bio;
+	unsigned long long oldest = jiffies;
+	KIRQL flags;
+
+	spin_lock_irqsave(&bdev->in_flight_bios_lock, flags);
+
+	if (list_empty(&bdev->in_flight_bios)) {
+		oldest = 0;
+	} else {
+		list_for_each_entry(struct bio, bio, &bdev->in_flight_bios, locally_submitted_bios) {
+			if (bio->submission_timestamp != 0 && bio->submission_timestamp < oldest)
+				oldest = bio->submission_timestamp;
+		}
+	}
+
+	spin_unlock_irqrestore(&bdev->in_flight_bios_lock, flags);
+
+	return oldest;
+}
+
 static void rearm_disk_timeout_timer(struct block_device *bdev)
 {
 	unsigned long long oldest = oldest_bio_timestamp(bdev);
-	if (oldest + bdev->disk_timeout <= jiffies)
+
+	if (oldest == 0)
+		del_timer(&bdev->disk_timeout_timer);
+	else if (oldest + bdev->disk_timeout <= jiffies)
 		windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
 	else
 		mod_timer(&bdev->disk_timeout_timer, oldest + bdev->disk_timeout);
 }
+
+static void bio_endio_impl(struct bio *bio, bool was_accounted);
 
 NTSTATUS DrbdIoCompletion(
   _In_     PDEVICE_OBJECT DeviceObject,
