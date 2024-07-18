@@ -1762,7 +1762,7 @@ static void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_st
 
 	spin_lock_irqsave(&bdev->in_flight_bios_lock, flags);
 	list_for_each_entry_safe(struct bio, bio, bio2, &bdev->in_flight_bios, locally_submitted_bios) {
-//		list_del_init(&bio->locally_submitted_bios);
+		list_del_init(&bio->locally_submitted_bios);
 		list_add(&bio->locally_submitted_bios2, &tmp_list);
 	}
 	spin_unlock_irqrestore(&bdev->in_flight_bios_lock, flags);
@@ -1784,11 +1784,16 @@ static void disk_timeout_timer_fn(struct timer_list *t)
 }
 
 /* TODO: For the 'new' (1.1.17) disk timeout implementation:
-	1.) cancel timer when there are no bios in flight.
-	2.) remove DRBD instrumented code related to 1.1.9 disk timeout implementation
+	1.) Done: cancel timer when there are no bios in flight.
+	2.) Done: remove DRBD instrumented code related to 1.1.9 disk timeout implementation
 	3.) Why are there more timer triggers even when the disk failed?
+		One for data one for metadata
+		but sometimes there are even more (see 7. maybe this solves it)
 	4.) Test for data metadata and also primary secondary
 	5.) also test with external meta data
+	6.) Done: Cancel timer on bdev destroy
+	7.) Fail bios in generic_make_request rightaway
+		hope this fixes the random BSOD on sync target disk timeout
  */
 
 static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
@@ -2543,15 +2548,16 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 		spin_unlock_irqrestore(&bio->already_failed_lock, flags);
 		return;
 	}
-	spin_lock_irqsave(&bio->bi_bdev->in_flight_bios_lock, flags2);
-	list_del_init(&bio->locally_submitted_bios);
-	spin_unlock_irqrestore(&bio->bi_bdev->in_flight_bios_lock, flags2);
-
 	bio->already_failed = true;
 	spin_unlock_irqrestore(&bio->already_failed_lock, flags);
 
-	if (!bio->disk_timeout)
+	if (!bio->disk_timeout) {
+		spin_lock_irqsave(&bio->bi_bdev->in_flight_bios_lock, flags2);
+		list_del_init(&bio->locally_submitted_bios);
+		spin_unlock_irqrestore(&bio->bi_bdev->in_flight_bios_lock, flags2);
+
 		rearm_disk_timeout_timer(bio->bi_bdev);
+	}	/* Else we got called by fail_all_in_flight_bios */
 
 	bio_get(bio);
 
