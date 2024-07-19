@@ -1760,6 +1760,8 @@ static void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_st
 
 	INIT_LIST_HEAD(&tmp_list);
 
+	bdev->disk_timed_out = true;
+
 	spin_lock_irqsave(&bdev->in_flight_bios_lock, flags);
 	list_for_each_entry_safe(struct bio, bio, bio2, &bdev->in_flight_bios, locally_submitted_bios) {
 		list_del_init(&bio->locally_submitted_bios);
@@ -2492,6 +2494,11 @@ int generic_make_request(struct bio *bio)
 	KIRQL flags;
 	int i;
 
+	if (bdev->disk_timed_out) {
+		bio->bi_status = BLK_STS_TIMEOUT;
+		bio_endio(bio);
+		return -ETIMEDOUT;
+	}
 	bio->where_i_am = "in generic_make_request 1";
 
 		/* First thing: put bio on pending list before

@@ -654,6 +654,7 @@ struct block_device {
 
 	unsigned long long disk_timeout;
 	struct timer_list disk_timeout_timer;
+	bool disk_timed_out;
 };
 
 	/* Starting with version 0.7.1, this is the device extension
