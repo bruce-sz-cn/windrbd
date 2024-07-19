@@ -2566,6 +2566,8 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 		rearm_disk_timeout_timer(bio->bi_bdev);
 	}	/* Else we got called by fail_all_in_flight_bios */
 
+/* TODO: no bio_put if bio->disk_timeout the bio might be inside the
+ * IoCallDriver of the windrbd_generic_make_request function ... */
 	bio_get(bio);
 
 	if (bio->bi_end_io != NULL) {
