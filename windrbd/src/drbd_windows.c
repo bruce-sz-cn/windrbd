@@ -1845,6 +1845,9 @@ void windrbd_set_disk_timeout(struct block_device *bdev, unsigned long long time
 	if (bdev == NULL)
 		return;
 
+	printk("WinDRBD: setting disk timeout from %llu milliseconds to %llu milliseconds.\n", bdev->disk_timeout, timeout);
+	printk("(0 means disk timeout disabled)\n");
+
 	bdev->disk_timeout = timeout;
 	rearm_disk_timeout_timer(bdev);
 }
