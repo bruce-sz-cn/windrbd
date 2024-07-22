@@ -1604,5 +1604,6 @@ void windrbd_suspend_application_io(struct block_device *bdev, const char *msg);
 void windrbd_resume_application_io(struct block_device *bdev, const char *msg);
 
 // void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_status);
+void windrbd_set_disk_timeout(struct block_device *bdev, unsigned long long timeout);
 
 #endif // DRBD_WINDOWS_H

@@ -1829,8 +1829,7 @@ static void rearm_disk_timeout_timer(struct block_device *bdev)
 	unsigned long long now = jiffies;
 	unsigned long long oldest = oldest_bio_timestamp(bdev);
 
-		/* TODO: del_timer_sync? */
-	if (oldest == 0)
+	if (bdev->disk_timeout == 0 || oldest == 0)
 		del_timer(&bdev->disk_timeout_timer);
 	else if (oldest + bdev->disk_timeout <= now)
 {
@@ -1839,6 +1838,15 @@ printk("oldest is %lld bdev->disk_timeout is %lld now is %lld\n", oldest, bdev->
 }
 	else
 		mod_timer(&bdev->disk_timeout_timer, oldest + bdev->disk_timeout);
+}
+
+void windrbd_set_disk_timeout(struct block_device *bdev, unsigned long long timeout)
+{
+	if (bdev == NULL)
+		return;
+
+	bdev->disk_timeout = timeout;
+	rearm_disk_timeout_timer(bdev);
 }
 
 static void bio_endio_impl(struct bio *bio, bool was_accounted);
@@ -3383,7 +3391,7 @@ struct block_device *blkdev_get_by_path(const char *path, fmode_t mode, void *ho
 	INIT_LIST_HEAD(&block_device->in_flight_bios);
 
 		/* we have our own timer now, new in 1.1.17 */
-	block_device->disk_timeout = HZ;	/* TODO: 1 second, hardcoded */
+	block_device->disk_timeout = 0;
         timer_setup(&block_device->disk_timeout_timer, disk_timeout_timer_fn, 0);
 
 	inject_faults(-1, &block_device->inject_on_completion);
