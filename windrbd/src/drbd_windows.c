@@ -1754,13 +1754,14 @@ static void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_st
 	struct list_head tmp_list;
 	struct bio *bio, *bio2;
 
+	printk("Failing all in-flight bios, disk should detach.\n");
+	printk("Please repair the disk and run drbdadm attach.\n");
+
 		/* Valid. backing dev might be detached. */
 	if (bdev == NULL)
 		return;
 
 	INIT_LIST_HEAD(&tmp_list);
-
-	bdev->disk_timed_out = true;
 
 	spin_lock_irqsave(&bdev->in_flight_bios_lock, flags);
 	list_for_each_entry_safe(struct bio, bio, bio2, &bdev->in_flight_bios, locally_submitted_bios) {
@@ -1788,14 +1789,17 @@ static void disk_timeout_timer_fn(struct timer_list *t)
 /* TODO: For the 'new' (1.1.17) disk timeout implementation:
 	1.) Done: cancel timer when there are no bios in flight.
 	2.) Done: remove DRBD instrumented code related to 1.1.9 disk timeout implementation
-	3.) Why are there more timer triggers even when the disk failed?
+	3.) Done: Why are there more timer triggers even when the disk failed?
 		One for data one for metadata
 		but sometimes there are even more (see 7. maybe this solves it)
-	4.) Test for data metadata and also primary secondary
-	5.) also test with external meta data
+		Ok works now
+	4.) Test for data metadata and also primary secondary -> Devin
+	5.) also test with external meta data -> Devin
 	6.) Done: Cancel timer on bdev destroy
-	7.) Fail bios in generic_make_request rightaway
+	7.) Done: Fail bios in generic_make_request rightaway
 		hope this fixes the random BSOD on sync target disk timeout
+	8.) Patch out the DRBD timeout handler (disk timeout)
+	9.) DRBD should tell WinDRBD about the disk timeout setting
  */
 
 static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
@@ -2494,11 +2498,6 @@ int generic_make_request(struct bio *bio)
 	KIRQL flags;
 	int i;
 
-	if (bdev->disk_timed_out) {
-		bio->bi_status = BLK_STS_TIMEOUT;
-		bio_endio(bio);
-		return -ETIMEDOUT;
-	}
 	bio->where_i_am = "in generic_make_request 1";
 
 		/* First thing: put bio on pending list before
