@@ -2553,9 +2553,21 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 	spin_lock_irqsave(&bio->already_failed_lock, flags);
 	if (bio->already_failed) {
 		spin_unlock_irqrestore(&bio->already_failed_lock, flags);
+		bio_put(bio);
 		return;
 	}
 	bio->already_failed = true;
+
+/* bio_get: we are still using the bio if the disk should
+ * answer at a later point in time (bio_endio will be called again)
+ * Also this should protect against a bio_free in IoCallDriver of
+ * the windrbd_generic_make_request function ... (when WinDRBD
+ * fails the pending bios and a bio is used by the disk driver)
+ * This must be inside the spinlock else the second bio_endio
+ * (from the disk) might run before the bio_get() ...
+ */
+	if (bio->disk_timeout)
+		bio_get(bio);
 	spin_unlock_irqrestore(&bio->already_failed_lock, flags);
 
 	if (!bio->disk_timeout) {
@@ -2566,8 +2578,6 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
 		rearm_disk_timeout_timer(bio->bi_bdev);
 	}	/* Else we got called by fail_all_in_flight_bios */
 
-/* TODO: no bio_put if bio->disk_timeout the bio might be inside the
- * IoCallDriver of the windrbd_generic_make_request function ... */
 	bio_get(bio);
 
 	if (bio->bi_end_io != NULL) {
