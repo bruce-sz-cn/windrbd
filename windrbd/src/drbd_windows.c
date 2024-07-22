@@ -1826,13 +1826,17 @@ static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
 
 static void rearm_disk_timeout_timer(struct block_device *bdev)
 {
+	unsigned long long now = jiffies;
 	unsigned long long oldest = oldest_bio_timestamp(bdev);
 
 		/* TODO: del_timer_sync? */
 	if (oldest == 0)
 		del_timer(&bdev->disk_timeout_timer);
-	else if (oldest + bdev->disk_timeout <= jiffies)
+	else if (oldest + bdev->disk_timeout <= now)
+{
+printk("oldest is %lld bdev->disk_timeout is %lld now is %lld\n", oldest, bdev->disk_timeout, now);
 		windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
+}
 	else
 		mod_timer(&bdev->disk_timeout_timer, oldest + bdev->disk_timeout);
 }
