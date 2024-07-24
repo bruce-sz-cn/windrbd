@@ -6,6 +6,14 @@ Base on DRBD 9.1
 
 DRBD reactor support
 
+What's new in version 1.1.17
+----------------------------
+
+WinDRBD now has its own timer to detect disk timeouts. This
+fixes disk timeout on secondaries, during resync and also
+for meta data. The DRBD disk timeout timers have been removed.
+This solves many issues we had in conjunction with disk timeouts.
+
 What's new in version 1.1.16
 ----------------------------
 
