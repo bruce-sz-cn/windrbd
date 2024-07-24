@@ -829,7 +829,7 @@ static struct bio *bio_alloc_ll(gfp_t gfp_mask, int nr_iovecs, ULONG Tag)
 	bio->already_failed = false;
 	bio->where_i_am = "just allocated";
 	bio->submission_timestamp = 0;
-	bio->disk_timeout = 0;
+	bio->disk_has_timed_out = false;
 
 	return bio;
 }
@@ -1773,7 +1773,7 @@ static void windrbd_fail_all_in_flight_bios(struct block_device *bdev, int bi_st
 	list_for_each_entry(struct bio, bio, &tmp_list, locally_submitted_bios2) {
 // printk("disk timeout, failing bio %p (was last at %s)\n", bio, bio->where_i_am);
 		bio->bi_status = bi_status;
-		bio->disk_timeout = 1;
+		bio->disk_has_timed_out = true;
 		bio_endio(bio); /* will remove this bio from the list */
 	}
 }
@@ -1786,20 +1786,21 @@ static void disk_timeout_timer_fn(struct timer_list *t)
 	windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
 }
 
-/* TODO: For the 'new' (1.1.17) disk timeout implementation:
+/* Done: For the 'new' (1.1.17) disk timeout implementation:
 	1.) Done: cancel timer when there are no bios in flight.
 	2.) Done: remove DRBD instrumented code related to 1.1.9 disk timeout implementation
 	3.) Done: Why are there more timer triggers even when the disk failed?
 		One for data one for metadata
 		but sometimes there are even more (see 7. maybe this solves it)
 		Ok works now
-	4.) Test for data metadata and also primary secondary -> Devin
-	5.) also test with external meta data -> Devin
+	4.) Done: Test for data metadata and also primary secondary -> Devin
+	5.) Done: also test with external meta data -> Devin
 	6.) Done: Cancel timer on bdev destroy
 	7.) Done: Fail bios in generic_make_request rightaway
 		hope this fixes the random BSOD on sync target disk timeout
-	8.) Patch out the DRBD timeout handler (disk timeout)
-	9.) DRBD should tell WinDRBD about the disk timeout setting
+		yes it does
+	8.) Done: Patch out the DRBD timeout handler (disk timeout)
+	9.) Done: DRBD should tell WinDRBD about the disk timeout setting
  */
 
 static unsigned long long oldest_bio_timestamp(struct block_device *bdev)
@@ -1832,10 +1833,7 @@ static void rearm_disk_timeout_timer(struct block_device *bdev)
 	if (bdev->disk_timeout == 0 || oldest == 0)
 		del_timer(&bdev->disk_timeout_timer);
 	else if (oldest + bdev->disk_timeout <= now)
-{
-printk("oldest is %lld bdev->disk_timeout is %lld now is %lld\n", oldest, bdev->disk_timeout, now);
 		windrbd_fail_all_in_flight_bios(bdev, BLK_STS_TIMEOUT);
-}
 	else
 		mod_timer(&bdev->disk_timeout_timer, oldest + bdev->disk_timeout);
 }
@@ -1845,8 +1843,10 @@ void windrbd_set_disk_timeout(struct block_device *bdev, unsigned long long time
 	if (bdev == NULL)
 		return;
 
-	printk("WinDRBD: setting disk timeout from %llu milliseconds to %llu milliseconds.\n", bdev->disk_timeout, timeout);
-	printk("(0 means disk timeout disabled)\n");
+	if (bdev->disk_timeout != timeout) {
+		printk("WinDRBD: setting disk timeout from %llu milliseconds to %llu milliseconds.\n", bdev->disk_timeout, timeout);
+		printk("(0 means disk timeout disabled)\n");
+	}
 
 	bdev->disk_timeout = timeout;
 	rearm_disk_timeout_timer(bdev);
@@ -2580,11 +2580,11 @@ static void bio_endio_impl(struct bio *bio, bool was_accounted)
  * This must be inside the spinlock else the second bio_endio
  * (from the disk) might run before the bio_get() ...
  */
-	if (bio->disk_timeout)
+	if (bio->disk_has_timed_out)
 		bio_get(bio);
 	spin_unlock_irqrestore(&bio->already_failed_lock, flags);
 
-	if (!bio->disk_timeout) {
+	if (!bio->disk_has_timed_out) {
 		spin_lock_irqsave(&bio->bi_bdev->in_flight_bios_lock, flags2);
 		list_del_init(&bio->locally_submitted_bios);
 		spin_unlock_irqrestore(&bio->bi_bdev->in_flight_bios_lock, flags2);
@@ -3395,7 +3395,7 @@ struct block_device *blkdev_get_by_path(const char *path, fmode_t mode, void *ho
 
 		/* we have our own timer now, new in 1.1.17 */
 	block_device->disk_timeout = 0;
-        timer_setup(&block_device->disk_timeout_timer, disk_timeout_timer_fn, 0);
+	timer_setup(&block_device->disk_timeout_timer, disk_timeout_timer_fn, 0);
 
 	inject_faults(-1, &block_device->inject_on_completion);
 	inject_faults(-1, &block_device->inject_on_request);
@@ -3803,8 +3803,8 @@ block_device->my_auto_promote = 1;
 	spin_lock_init(&block_device->in_flight_bios_lock);
 	INIT_LIST_HEAD(&block_device->in_flight_bios);
 		/* we have our own timer now, new in 1.1.17 */
-	block_device->disk_timeout = HZ;	/* TODO: 1 second, hardcoded */
-        timer_setup(&block_device->disk_timeout_timer, disk_timeout_timer_fn, 0);
+	block_device->disk_timeout = 0;
+	timer_setup(&block_device->disk_timeout_timer, disk_timeout_timer_fn, 0);
 	inject_faults(-1, &block_device->inject_on_completion);
 	inject_faults(-1, &block_device->inject_on_request);
 

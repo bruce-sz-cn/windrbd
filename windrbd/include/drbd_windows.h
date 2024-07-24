@@ -867,7 +867,7 @@ struct bio {
 
 	char *where_i_am;	/* checkpoints for debugging backing dev timeout. */
 	unsigned long long submission_timestamp;
-	int disk_timeout;
+	bool disk_has_timed_out;
 
 	/* TODO: may be put members here again? Update: Not sure,
 	 * we've put a KEVENT here and it didn't work .. might also
