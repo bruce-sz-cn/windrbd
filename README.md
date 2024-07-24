@@ -336,3 +336,4 @@ Version history
  * 1.1.14 (May 14, 2024): Fix for drbdadm create-md, downgrade cygwin DLL 3.5.3 -> 3.4.10
  * 1.1.15 (May 27, 2024): Kernel stacks locked in memory fixing a rare BSOD
  * 1.1.16 (June 26, 2024): Initialize bios_event also for upper block devices
+ * 1.1.17 (July 24, 2024): Disk timeout now handled by WinDRBD (not DRBD)
