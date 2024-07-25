@@ -6,6 +6,14 @@ Base on DRBD 9.1
 
 DRBD reactor support
 
+What's new in version 1.1.18
+----------------------------
+
+Cygwin update: fix for console close. Before that sometimes
+processes (like drbdadm, ...) took several seconds to exit
+and sometimes they never exited at all. This should be fixed
+with this version.
+
 What's new in version 1.1.17
 ----------------------------
 
