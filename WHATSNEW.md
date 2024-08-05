@@ -6,6 +6,14 @@ Base on DRBD 9.1
 
 DRBD reactor support
 
+What's new in version 1.1.19
+----------------------------
+
+Disabled backing device I/O corking which was introduced in
+WinDRBD 1.1.8. This caused I/O to hang longer than expected
+(several minutes). Expect bitmap I/O (initial read of bitmap)
+being slower now (as in pre-1.1.8 releases).
+
 What's new in version 1.1.18
 ----------------------------
 
