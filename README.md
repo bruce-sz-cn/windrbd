@@ -338,3 +338,4 @@ Version history
  * 1.1.16 (June 26, 2024): Initialize bios_event also for upper block devices
  * 1.1.17 (July 24, 2024): Disk timeout now handled by WinDRBD (not DRBD)
  * 1.1.18 (July 25, 2024): Cygwin console close patch: drbdadm shouldn't hang on exiting
+ * 1.1.19 (August 5, 2024): Disabled backing device I/O corking again
